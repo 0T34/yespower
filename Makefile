@@ -20,11 +20,16 @@ CC = gcc
 LD = $(CC)
 RM = rm -f
 OMPFLAGS = -fopenmp
-CFLAGS = -Wall -O2 -fomit-frame-pointer
-#CFLAGS = -Wall -msse -O2 -fomit-frame-pointer
-#CFLAGS = -Wall -msse2 -O2 -fomit-frame-pointer
-#CFLAGS = -Wall -O2 -march=native -fomit-frame-pointer
-# -lrt is for benchmark's use of clock_gettime()
+CFLAGS = -Wall -O2 -march=native -fomit-frame-pointer
+
+ifeq ($(OS), Windows_NT)
+	CFLAGS += -msse2
+else
+	ifneq ($(shell grep -o ARM /proc/cpuinfo), " ")
+		CFLAGS += -mfpu=neon
+	endif
+endif
+
 LDFLAGS = -s -lrt
 
 PROJ = tests benchmark

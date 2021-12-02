@@ -55,6 +55,8 @@
 #warning "Note: AVX is enabled.  That's OK."
 #elif defined(__SSE2__)
 #warning "Note: AVX and XOP are not enabled.  That's OK."
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+#warning "Note: NEON is enabled.  That's OK."
 #elif defined(__x86_64__) || defined(__i386__)
 #warning "SSE2 not enabled.  Expect poor performance."
 #else
