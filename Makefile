@@ -22,10 +22,8 @@ RM = rm -f
 OMPFLAGS = -fopenmp
 CFLAGS = -Wall -O2 -march=native -fomit-frame-pointer
 
-ifeq ($(OS), Windows_NT)
-	CFLAGS += -msse2
-else
-	ifneq ($(shell grep -o ARM /proc/cpuinfo), " ")
+ifneq ($(OS), Windows_NT)
+	ifneq ($(shell grep -o ARM /proc/cpuinfo),)
 		CFLAGS += -mfpu=neon
 	endif
 endif
