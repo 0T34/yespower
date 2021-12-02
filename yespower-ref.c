@@ -166,7 +166,6 @@ static void blockmix_salsa(uint32_t *B, uint32_t rounds)
 #define Swidth_to_Smask(Swidth) (((1 << Swidth) - 1) * PWXsimple * 8)
 
 typedef struct {
-	yespower_version_t version;
 	uint32_t salsa20_rounds;
 	uint32_t PWXrounds, Swidth, Sbytes, Smask;
 	uint32_t *S;
@@ -218,8 +217,7 @@ static void pwxform(uint32_t *B, pwxform_ctx_t *ctx)
 				X[j][k][1] = x >> 32;
 			}
 
-			if (ctx->version != YESPOWER_0_5 &&
-			    (i == 0 || j < PWXgather / 2)) {
+			if (i == 0 || j < PWXgather / 2) {
 				if (j & 1) {
 					for (k = 0; k < PWXsimple; k++) {
 						S1[w][0] = X[j][k][0];
@@ -236,14 +234,12 @@ static void pwxform(uint32_t *B, pwxform_ctx_t *ctx)
 		}
 	}
 
-	if (ctx->version != YESPOWER_0_5) {
-		/* 14: (S0, S1, S2) <-- (S2, S0, S1) */
-		ctx->S0 = S2;
-		ctx->S1 = S0;
-		ctx->S2 = S1;
-		/* 15: w <-- w mod 2^Swidth */
-		ctx->w = w & ((1 << ctx->Swidth) * PWXsimple - 1);
-	}
+	/* 14: (S0, S1, S2) <-- (S2, S0, S1) */
+	ctx->S0 = S2;
+	ctx->S1 = S0;
+	ctx->S2 = S1;
+	/* 15: w <-- w mod 2^Swidth */
+	ctx->w = w & ((1 << ctx->Swidth) * PWXsimple - 1);
 }
 
 /**
@@ -348,11 +344,9 @@ static void smix1(uint32_t *B, size_t r, uint32_t N,
 		for (i = 0; i < 16; i++)
 			X[k * 16 + i] = le32dec(&B[k * 16 + (i * 5 % 16)]);
 
-	if (ctx->version != YESPOWER_0_5) {
-		for (k = 1; k < r; k++) {
-			blkcpy(&X[k * 32], &X[(k - 1) * 32], 32);
-			blockmix_pwxform(&X[k * 32], ctx, 1);
-		}
+	for (k = 1; k < r; k++) {
+		blkcpy(&X[k * 32], &X[(k - 1) * 32], 32);
+		blockmix_pwxform(&X[k * 32], ctx, 1);
 	}
 
 	/* 2: for i = 0 to N - 1 do */
@@ -435,11 +429,7 @@ static void smix(uint32_t *B, size_t r, uint32_t N,
 	uint32_t Nloop_rw = Nloop_all;
 
 	Nloop_all++; Nloop_all &= ~(uint32_t)1; /* round up to even */
-	if (ctx->version == YESPOWER_0_5) {
-		Nloop_rw &= ~(uint32_t)1; /* round down to even */
-	} else {
-		Nloop_rw++; Nloop_rw &= ~(uint32_t)1; /* round up to even */
-	}
+	Nloop_rw++; Nloop_rw &= ~(uint32_t)1; /* round up to even */
 
 	smix1(B, 1, ctx->Sbytes / 128, ctx->S, X, ctx);
 	smix1(B, r, N, V, X, ctx);
@@ -457,7 +447,6 @@ int yespower(yespower_local_t *local,
     const uint8_t *src, size_t srclen,
     const yespower_params_t *params, yespower_binary_t *dst)
 {
-	yespower_version_t version = params->version;
 	uint32_t N = params->N;
 	uint32_t r = params->r;
 	const uint8_t *pers = params->pers;
@@ -471,8 +460,7 @@ int yespower(yespower_local_t *local,
 	memset(dst, 0xff, sizeof(*dst));
 
 	/* Sanity-check parameters */
-	if ((version != YESPOWER_0_5 && version != YESPOWER_1_0) ||
-	    N < 1024 || N > 512 * 1024 || r < 8 || r > 32 ||
+	if (N < 1024 || N > 512 * 1024 || r < 8 || r > 32 ||
 	    (N & (N - 1)) != 0 || r < rmin ||
 	    (!pers && perslen)) {
 		errno = EINVAL;
@@ -488,18 +476,12 @@ int yespower(yespower_local_t *local,
 		goto free_V;
 	if ((X = malloc(B_size)) == NULL)
 		goto free_B;
-	ctx.version = version;
-	if (version == YESPOWER_0_5) {
-		ctx.salsa20_rounds = 8;
-		ctx.PWXrounds = PWXrounds_0_5;
-		ctx.Swidth = Swidth_0_5;
-		ctx.Sbytes = 2 * Swidth_to_Sbytes1(ctx.Swidth);
-	} else {
-		ctx.salsa20_rounds = 2;
-		ctx.PWXrounds = PWXrounds_1_0;
-		ctx.Swidth = Swidth_1_0;
-		ctx.Sbytes = 3 * Swidth_to_Sbytes1(ctx.Swidth);
-	}
+
+	ctx.salsa20_rounds = 2;
+	ctx.PWXrounds = PWXrounds_1_0;
+	ctx.Swidth = Swidth_1_0;
+	ctx.Sbytes = 3 * Swidth_to_Sbytes1(ctx.Swidth);
+
 	if ((S = malloc(ctx.Sbytes)) == NULL)
 		goto free_X;
 	ctx.S = S;
@@ -511,13 +493,11 @@ int yespower(yespower_local_t *local,
 
 	SHA256_Buf(src, srclen, (uint8_t *)sha256);
 
-	if (version != YESPOWER_0_5) {
-		if (pers) {
-			src = pers;
-			srclen = perslen;
-		} else {
-			srclen = 0;
-		}
+	if (pers) {
+		src = pers;
+		srclen = perslen;
+	} else {
+		srclen = 0;
 	}
 
 	/* 1: (B_0 ... B_{p-1}) <-- PBKDF2(P, S, 1, p * MFLen) */
@@ -529,20 +509,8 @@ int yespower(yespower_local_t *local,
 	/* 3: B_i <-- MF(B_i, N) */
 	smix(B, r, N, V, X, &ctx);
 
-	if (version == YESPOWER_0_5) {
-		/* 5: DK <-- PBKDF2(P, B, 1, dkLen) */
-		PBKDF2_SHA256((uint8_t *)sha256, sizeof(sha256),
-		    (uint8_t *)B, B_size, 1, (uint8_t *)dst, sizeof(*dst));
-
-		if (pers) {
-			HMAC_SHA256_Buf(dst, sizeof(*dst), pers, perslen,
-			    (uint8_t *)sha256);
-			SHA256_Buf(sha256, sizeof(sha256), (uint8_t *)dst);
-		}
-	} else {
-		HMAC_SHA256_Buf((uint8_t *)B + B_size - 64, 64,
-		    sha256, sizeof(sha256), (uint8_t *)dst);
-	}
+	HMAC_SHA256_Buf((uint8_t *)B + B_size - 64, 64,
+	    sha256, sizeof(sha256), (uint8_t *)dst);
 
 	/* Success! */
 	retval = 0;

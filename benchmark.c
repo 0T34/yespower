@@ -50,7 +50,6 @@ static uint64_t time_us(void)
 int main(int argc, const char * const *argv)
 {
 	yespower_params_t params = {
-		.version = YESPOWER_0_5,
 		.N = 2048,
 		.r = 8,
 		.pers = (const uint8_t *)"Client Key",
@@ -58,14 +57,12 @@ int main(int argc, const char * const *argv)
 	};
 
 	if (argc > 1)
-		params.version = atoi(argv[1]);
+		params.N = atoi(argv[1]);
 	if (argc > 2)
-		params.N = atoi(argv[2]);
-	if (argc > 3)
-		params.r = atoi(argv[3]);
+		params.r = atoi(argv[2]);
 
-	printf("version=%.1f N=%u r=%u\n",
-	    params.version * 0.1, params.N, params.r);
+	printf("N=%u r=%u\n",
+	    params.N, params.r);
 
 	printf("Will use %.2f KiB RAM\n", 0.125 * params.N * params.r);
 
