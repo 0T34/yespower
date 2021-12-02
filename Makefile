@@ -38,7 +38,7 @@ all: $(PROJ)
 
 check: tests
 	@echo 'Running tests'
-	@time ./tests | tee TESTS-OUT
+	@./tests | tee TESTS-OUT
 	@diff -U0 TESTS-OK TESTS-OUT && echo PASSED || echo FAILED
 
 ref:
@@ -60,7 +60,7 @@ benchmark.o: benchmark.c
 	$(CC) -c $(CFLAGS) $*.c
 
 yespower-ref.o: yespower.h
-yespower-opt.o: yespower-platform.c yespower.h
+yespower-opt.o: yespower.h
 tests.o: yespower.h
 benchmark.o: yespower.h
 
