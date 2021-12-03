@@ -89,6 +89,12 @@
 #endif
 #elif defined(__SSE__)
 #include <xmmintrin.h>
+#if defined(__x86_64__) && defined(__SSE4_1__)
+/* No known bugs for this intrinsic */
+#include <smmintrin.h>
+#endif
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+#include <arm_neon.h>
 #endif
 
 #include <errno.h>
@@ -205,17 +211,13 @@ static int free_region(yespower_region_t *region)
 #define unlikely(exp) (exp)
 #endif
 
-#ifdef __SSE__
-#define PREFETCH(x, hint) _mm_prefetch((const char *)(x), (hint));
-#else
-#undef PREFETCH
-#endif
-
 typedef union {
 	uint32_t w[16];
 	uint64_t d[8];
 #ifdef __SSE2__
 	__m128i q[4];
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+	uint32x4_t q[4];
 #endif
 } salsa20_blk_t;
 
@@ -257,6 +259,14 @@ static inline void salsa20_simd_unshuffle(const salsa20_blk_t *Bin,
 	__m128i X0, X1, X2, X3;
 #define DECL_Y \
 	__m128i Y0, Y1, Y2, Y3;
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+#define DECL_X \
+	uint32x4_t X0, X1, X2, X3;
+#define DECL_Y \
+	uint32x4_t Y0, Y1, Y2, Y3;
+#endif
+
+#if defined(__SSE2__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
 #define READ_X(in) \
 	X0 = (in).q[0]; X1 = (in).q[1]; X2 = (in).q[2]; X3 = (in).q[3];
 #define WRITE_X(out) \
@@ -265,6 +275,12 @@ static inline void salsa20_simd_unshuffle(const salsa20_blk_t *Bin,
 #ifdef __XOP__
 #define ARX(out, in1, in2, s) \
 	out = _mm_xor_si128(out, _mm_roti_epi32(_mm_add_epi32(in1, in2), s));
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+#define ARX(out, in1, in2, s) { \
+	uint32x4_t tmp = vaddq_u32(in1, in2); \
+	out = veorq_u32(out, vshlq_n_u32(tmp, s)); \
+	out = veorq_u32(out, vshrq_n_u32(tmp, 32 - s)); \
+}
 #else
 #define ARX(out, in1, in2, s) { \
 	__m128i tmp = _mm_add_epi32(in1, in2); \
@@ -273,6 +289,27 @@ static inline void salsa20_simd_unshuffle(const salsa20_blk_t *Bin,
 }
 #endif
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#define SALSA20_2ROUNDS \
+	/* Operate on "columns" */ \
+	ARX(X1, X0, X3, 7) \
+	ARX(X2, X1, X0, 9) \
+	ARX(X3, X2, X1, 13) \
+	ARX(X0, X3, X2, 18) \
+	/* Rearrange data */ \
+	X1 = vextq_u32(X1, X1, 3); \
+	X2 = vextq_u32(X2, X2, 2); \
+	X3 = vextq_u32(X3, X3, 1); \
+	/* Operate on "rows" */ \
+	ARX(X3, X0, X1, 7) \
+	ARX(X2, X3, X0, 9) \
+	ARX(X1, X2, X3, 13) \
+	ARX(X0, X1, X2, 18) \
+	/* Rearrange data */ \
+	X1 = vextq_u32(X1, X1, 1); \
+	X2 = vextq_u32(X2, X2, 2); \
+	X3 = vextq_u32(X3, X3, 3);
+#else
 #define SALSA20_2ROUNDS \
 	/* Operate on "columns" */ \
 	ARX(X1, X0, X3, 7) \
@@ -292,10 +329,21 @@ static inline void salsa20_simd_unshuffle(const salsa20_blk_t *Bin,
 	X1 = _mm_shuffle_epi32(X1, 0x39); \
 	X2 = _mm_shuffle_epi32(X2, 0x4E); \
 	X3 = _mm_shuffle_epi32(X3, 0x93);
+#endif
 
 /**
  * Apply the Salsa20 core to the block provided in (X0 ... X3).
  */
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#define SALSA20_wrapper(out, rounds) { \
+	uint32x4_t Z0 = X0, Z1 = X1, Z2 = X2, Z3 = X3; \
+	rounds \
+	(out).q[0] = X0 = vaddq_u32(X0, Z0); \
+	(out).q[1] = X1 = vaddq_u32(X1, Z1); \
+	(out).q[2] = X2 = vaddq_u32(X2, Z2); \
+	(out).q[3] = X3 = vaddq_u32(X3, Z3); \
+}
+#else
 #define SALSA20_wrapper(out, rounds) { \
 	__m128i Z0 = X0, Z1 = X1, Z2 = X2, Z3 = X3; \
 	rounds \
@@ -304,6 +352,7 @@ static inline void salsa20_simd_unshuffle(const salsa20_blk_t *Bin,
 	(out).q[2] = X2 = _mm_add_epi32(X2, Z2); \
 	(out).q[3] = X3 = _mm_add_epi32(X3, Z3); \
 }
+#endif
 
 /**
  * Apply the Salsa20/2 core to the block provided in X.
@@ -320,18 +369,45 @@ static inline void salsa20_simd_unshuffle(const salsa20_blk_t *Bin,
 #define SALSA20_8(out) \
 	SALSA20_wrapper(out, SALSA20_8ROUNDS)
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#define XOR_X(in) \
+	X0 = veorq_u32(X0, (in).q[0]); \
+	X1 = veorq_u32(X1, (in).q[1]); \
+	X2 = veorq_u32(X2, (in).q[2]); \
+	X3 = veorq_u32(X3, (in).q[3]);
+#else
 #define XOR_X(in) \
 	X0 = _mm_xor_si128(X0, (in).q[0]); \
 	X1 = _mm_xor_si128(X1, (in).q[1]); \
 	X2 = _mm_xor_si128(X2, (in).q[2]); \
 	X3 = _mm_xor_si128(X3, (in).q[3]);
+#endif
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#define XOR_X_2(in1, in2) \
+	X0 = veorq_u32((in1).q[0], (in2).q[0]); \
+	X1 = veorq_u32((in1).q[1], (in2).q[1]); \
+	X2 = veorq_u32((in1).q[2], (in2).q[2]); \
+	X3 = veorq_u32((in1).q[3], (in2).q[3]);
+#else
 #define XOR_X_2(in1, in2) \
 	X0 = _mm_xor_si128((in1).q[0], (in2).q[0]); \
 	X1 = _mm_xor_si128((in1).q[1], (in2).q[1]); \
 	X2 = _mm_xor_si128((in1).q[2], (in2).q[2]); \
 	X3 = _mm_xor_si128((in1).q[3], (in2).q[3]);
+#endif
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#define XOR_X_WRITE_XOR_Y_2(out, in) \
+	(out).q[0] = Y0 = veorq_u32((out).q[0], (in).q[0]); \
+	(out).q[1] = Y1 = veorq_u32((out).q[1], (in).q[1]); \
+	(out).q[2] = Y2 = veorq_u32((out).q[2], (in).q[2]); \
+	(out).q[3] = Y3 = veorq_u32((out).q[3], (in).q[3]); \
+	X0 = veorq_u32(X0, Y0); \
+	X1 = veorq_u32(X1, Y1); \
+	X2 = veorq_u32(X2, Y2); \
+	X3 = veorq_u32(X3, Y3);
+#else
 #define XOR_X_WRITE_XOR_Y_2(out, in) \
 	(out).q[0] = Y0 = _mm_xor_si128((out).q[0], (in).q[0]); \
 	(out).q[1] = Y1 = _mm_xor_si128((out).q[1], (in).q[1]); \
@@ -341,8 +417,13 @@ static inline void salsa20_simd_unshuffle(const salsa20_blk_t *Bin,
 	X1 = _mm_xor_si128(X1, Y1); \
 	X2 = _mm_xor_si128(X2, Y2); \
 	X3 = _mm_xor_si128(X3, Y3);
+#endif
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#define INTEGERIFY vgetq_lane_u32(X0, 0)
+#else
 #define INTEGERIFY _mm_cvtsi128_si32(X0)
+#endif
 
 #else /* !defined(__SSE2__) */
 
@@ -525,7 +606,7 @@ typedef struct {
 #define DECL_SMASK2REG /* empty */
 #define MAYBE_MEMORY_BARRIER /* empty */
 
-#ifdef __SSE2__
+#if defined(__SSE2__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
 /*
  * (V)PSRLDQ and (V)PSHUFD have higher throughput than (V)PSRLQ on some CPUs
  * starting with Sandy Bridge.  Additionally, PSHUFD uses separate source and
@@ -538,12 +619,14 @@ typedef struct {
 #ifdef __AVX__
 #define HI32(X) \
 	_mm_srli_si128((X), 4)
-#elif 1 /* As an option, check for __SSE4_1__ here not to hurt Conroe */
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+#define LO32(X) \
+	vmovn_u64(vreinterpretq_u64_u32(X))
 #define HI32(X) \
-	_mm_shuffle_epi32((X), _MM_SHUFFLE(2,3,0,1))
+	LO32(vrev64q_u32(X))
 #else
 #define HI32(X) \
-	_mm_srli_epi64((X), 32)
+	_mm_shuffle_epi32((X), _MM_SHUFFLE(2,3,0,1))
 #endif
 
 #if defined(__x86_64__) && \
@@ -565,18 +648,10 @@ typedef struct {
 #define EXTRACT64(X) _mm_cvtsi128_si64(X)
 #elif defined(__x86_64__) && defined(__SSE4_1__)
 /* No known bugs for this intrinsic */
-#include <smmintrin.h>
 #define EXTRACT64(X) _mm_extract_epi64((X), 0)
-#elif defined(USE_SSE4_FOR_32BIT) && defined(__SSE4_1__)
-/* 32-bit */
-#include <smmintrin.h>
-#if 0
-/* This is currently unused by the code below, which instead uses these two
- * intrinsics explicitly when (!defined(__x86_64__) && defined(__SSE4_1__)) */
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
 #define EXTRACT64(X) \
-	((uint64_t)(uint32_t)_mm_cvtsi128_si32(X) | \
-	((uint64_t)(uint32_t)_mm_extract_epi32((X), 1) << 32))
-#endif
+	vgetq_lane_u64(vreinterpretq_u64_u32(X), 0)
 #else
 /* 32-bit or compilers with known past bugs in _mm_cvtsi128_si64() */
 #define EXTRACT64(X) \
@@ -650,6 +725,15 @@ static volatile uint64_t Smask2var = Smask2;
 	X = _mm_add_epi64(X, s0); \
 	X = _mm_xor_si128(X, s1); \
 }
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+#define PWXFORM_SIMD(X) { \
+	uint64_t x = EXTRACT64(X) & Smask2; \
+	uint32x4_t s0 = *(const uint32x4_t *)(S0 + (uint32_t)x); \
+	uint32x4_t s1 = *(const uint32x4_t *)(S1 + (x >> 32)); \
+	X = vreinterpretq_u32_u64(vmull_u32(HI32(X), LO32(X))); \
+	X = vreinterpretq_u32_u64(vaddq_u64(vreinterpretq_u64_u32(X), vreinterpretq_u64_u32(s0))); \
+	X = veorq_u32(X, s1); \
+}
 #else
 /* 32-bit without SSE4.1 */
 #define PWXFORM_SIMD(X) { \
@@ -662,11 +746,19 @@ static volatile uint64_t Smask2var = Smask2;
 }
 #endif
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#define PWXFORM_SIMD_WRITE(X, Sw) \
+	PWXFORM_SIMD(X) \
+	MAYBE_MEMORY_BARRIER \
+	*(uint32x4_t *)(Sw + w) = X; \
+	MAYBE_MEMORY_BARRIER
+#else
 #define PWXFORM_SIMD_WRITE(X, Sw) \
 	PWXFORM_SIMD(X) \
 	MAYBE_MEMORY_BARRIER \
 	*(__m128i *)(Sw + w) = X; \
 	MAYBE_MEMORY_BARRIER
+#endif
 
 #define PWXFORM_ROUND \
 	PWXFORM_SIMD(X0) \
@@ -814,12 +906,10 @@ static uint32_t blockmix_xor(const salsa20_blk_t *restrict Bin1,
 	/* Convert count of 128-byte blocks to max index of 64-byte block */
 	r = r * 2 - 1;
 
-#ifdef PREFETCH
-	PREFETCH(&Bin2[r], _MM_HINT_T0)
+	__builtin_prefetch(&Bin2[r]);
 	for (i = 0; i < r; i++) {
-		PREFETCH(&Bin2[i], _MM_HINT_T0)
+		__builtin_prefetch(&Bin2[i]);
 	}
-#endif
 
 	XOR_X_2(Bin1[r], Bin2[r])
 
@@ -872,12 +962,10 @@ static uint32_t blockmix_xor_save(salsa20_blk_t *restrict Bin1out,
 	/* Convert count of 128-byte blocks to max index of 64-byte block */
 	r = r * 2 - 1;
 
-#ifdef PREFETCH
-	PREFETCH(&Bin2[r], _MM_HINT_T0)
+	__builtin_prefetch(&Bin2[r]);
 	for (i = 0; i < r; i++) {
-		PREFETCH(&Bin2[i], _MM_HINT_T0)
+		__builtin_prefetch(&Bin2[i]);
 	}
-#endif
 
 	XOR_X_2(Bin1out[r], Bin2[r])
 
