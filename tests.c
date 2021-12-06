@@ -23,44 +23,42 @@
 
 #include "yespower.h"
 
-#undef TEST_PBKDF2_SHA256
+#undef TEST_PBKDF2_SHA1
+#ifdef TEST_PBKDF2_SHA1
 
-#ifdef TEST_PBKDF2_SHA256
 #include <assert.h>
 
-#include "sha256.h"
+#include "sha1.h"
 
-static void print_PBKDF2_SHA256_raw(const char *passwd, size_t passwdlen,
-    const char *salt, size_t saltlen, uint64_t c, size_t dkLen)
-{
+static void print_PBKDF2_SHA1_raw(const char *passwd, size_t passwdlen,
+    const char *salt, size_t saltlen, uint64_t c, size_t dkLen) {
 	uint8_t dk[64];
 	size_t i;
 
 	assert(dkLen <= sizeof(dk));
 
 	/* XXX This prints the strings truncated at first NUL */
-	printf("PBKDF2_SHA256(\"%s\", \"%s\", %llu, %llu) = ",
+	printf("PBKDF2_SHA1(\"%s\", \"%s\", %llu, %llu) = ",
 	    passwd, salt, (unsigned long long)c, (unsigned long long)dkLen);
 
-	PBKDF2_SHA256((const uint8_t *) passwd, passwdlen,
+	PBKDF2_SHA1((const uint8_t *) passwd, passwdlen,
 	    (const uint8_t *) salt, saltlen, c, dk, dkLen);
 
-	for (i = 0; i < dkLen; i++)
+	for (i = 0; i < dkLen; i++) {
 		printf("%02x%c", dk[i], i < dkLen - 1 ? ' ' : '\n');
+	}
 }
 
-static void print_PBKDF2_SHA256(const char *passwd,
-    const char *salt, uint64_t c, size_t dkLen)
-{
-	print_PBKDF2_SHA256_raw(passwd, strlen(passwd), salt, strlen(salt), c,
+static void print_PBKDF2_SHA1(const char *passwd,
+    const char *salt, uint64_t c, size_t dkLen) {
+	print_PBKDF2_SHA1_raw(passwd, strlen(passwd), salt, strlen(salt), c,
 	    dkLen);
 }
 #endif
 
 static const char *pers_bsty_magic = "BSTY";
 
-static void print_yespower(uint32_t N, uint32_t r, const char *pers)
-{
+static void print_yespower(uint32_t N, uint32_t r, const char *pers) {
 	yespower_params_t params = {
 		.N = N,
 		.r = r,
@@ -88,12 +86,12 @@ static void print_yespower(uint32_t N, uint32_t r, const char *pers)
 		return;
 	}
 
-	for (i = 0; i < sizeof(dst); i++)
+	for (i = 0; i < sizeof(dst); i++) {
 		printf("%02x%c", dst.uc[i], i < sizeof(dst) - 1 ? ' ' : '\n');
+	}
 }
 
-static void print_yespower_loop(const char *pers)
-{
+static void print_yespower_loop(const char *pers) {
 	uint32_t N, r;
 	uint8_t src[80];
 	yespower_binary_t dst, xor = {{0}};
@@ -124,42 +122,29 @@ static void print_yespower_loop(const char *pers)
 				puts("FAILED");
 				return;
 			}
-			for (i = 0; i < sizeof(xor); i++)
+			for (i = 0; i < sizeof(xor); i++) {
 				xor.uc[i] ^= dst.uc[i];
+			}
 		}
 	}
 
-	for (i = 0; i < sizeof(xor); i++)
+	for (i = 0; i < sizeof(xor); i++) {
 		printf("%02x%c", xor.uc[i], i < sizeof(xor) - 1 ? ' ' : '\n');
+	}
 }
 
-int main(void)
-{
+int main(void) {
 	setvbuf(stdout, NULL, _IOLBF, 0);
 
-#ifdef TEST_PBKDF2_SHA256
-	print_PBKDF2_SHA256("password", "salt", 1, 20);
-	print_PBKDF2_SHA256("password", "salt", 2, 20);
-	print_PBKDF2_SHA256("password", "salt", 4096, 20);
-	print_PBKDF2_SHA256("password", "salt", 16777216, 20);
-	print_PBKDF2_SHA256("passwordPASSWORDpassword",
+#ifdef TEST_PBKDF2_SHA1
+	print_PBKDF2_SHA1("password", "salt", 1, 20);
+	print_PBKDF2_SHA1("password", "salt", 2, 20);
+	print_PBKDF2_SHA1("password", "salt", 4096, 20);
+	print_PBKDF2_SHA1("password", "salt", 65536, 20);
+	print_PBKDF2_SHA1("passwordPASSWORDpassword",
 	    "saltSALTsaltSALTsaltSALTsaltSALTsalt", 4096, 25);
-	print_PBKDF2_SHA256_raw("pass\0word", 9, "sa\0lt", 5, 4096, 16);
-#if 0
-	print_PBKDF2_SHA256("password", "salt", 1, 32);
-	print_PBKDF2_SHA256("password", "salt", 2, 32);
-	print_PBKDF2_SHA256("password", "salt", 4096, 32);
-	print_PBKDF2_SHA256("password", "salt", 16777216, 32);
-	print_PBKDF2_SHA256("passwordPASSWORDpassword",
-	    "saltSALTsaltSALTsaltSALTsaltSALTsalt", 4096, 40);
-	print_PBKDF2_SHA256("password", "salt", 4096, 16);
-	print_PBKDF2_SHA256("password", "salt", 1, 20);
-	print_PBKDF2_SHA256("password", "salt", 2, 20);
-	print_PBKDF2_SHA256("password", "salt", 4096, 20);
-	print_PBKDF2_SHA256("password", "salt", 16777216, 20);
-	print_PBKDF2_SHA256("password", "salt", 4096, 25);
-	print_PBKDF2_SHA256("password", "salt", 4096, 16);
-#endif
+	print_PBKDF2_SHA1_raw("pass\0word", 9, "sa\0lt", 5, 4096, 16);
+	printf("\n");
 #endif
 
 	print_yespower(2048, 8, NULL);
@@ -167,7 +152,6 @@ int main(void)
 	print_yespower(4096, 32, NULL);
 	print_yespower(2048, 32, NULL);
 	print_yespower(1024, 32, NULL);
-
 	print_yespower(1024, 32, "personality test");
 
 	print_yespower_loop(NULL);

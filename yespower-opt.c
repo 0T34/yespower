@@ -102,9 +102,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define insecure_memzero(buf, len) /* empty */
-
-#include "sha256.h"
+#include "sha1.h"
 #include "sysendian.h"
 
 #include "yespower.h"
@@ -1217,7 +1215,7 @@ int yespower(yespower_local_t *local,
 	uint8_t *B, *S;
 	salsa20_blk_t *V, *XY;
 	pwxform_ctx_t ctx;
-	uint8_t sha256[32];
+	uint8_t sha1[20];
 
 	/* Sanity-check parameters */
 	if (N < 1024 || N > 512 * 1024 || r < 8 || r > 32 ||
@@ -1249,7 +1247,7 @@ int yespower(yespower_local_t *local,
 	ctx.S0 = S;
 	ctx.S1 = S + Swidth_to_Sbytes1(Swidth);
 
-	SHA256_Buf(src, srclen, sha256);
+	SHA1_Buf(src, srclen, sha1);
 
 	ctx.S2 = S + 2 * Swidth_to_Sbytes1(Swidth);
 	ctx.w = 0;
@@ -1261,11 +1259,10 @@ int yespower(yespower_local_t *local,
 		srclen = 0;
 	}
 
-	PBKDF2_SHA256(sha256, sizeof(sha256), src, srclen, 1, B, 128);
-	memcpy(sha256, B, sizeof(sha256));
+	PBKDF2_SHA1(sha1, sizeof(sha1), src, srclen, 1, B, 128);
+	memcpy(sha1, B, sizeof(sha1));
 	smix_1_0(B, r, N, V, XY, &ctx);
-	HMAC_SHA256_Buf(B + B_size - 64, 64,
-		sha256, sizeof(sha256), (uint8_t *)dst);
+	HMAC_SHA1_Buf(B + B_size - 64, 64, sha1, sizeof(sha1), (uint8_t *)dst);
 
 	/* Success! */
 	return 0;

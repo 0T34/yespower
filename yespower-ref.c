@@ -51,7 +51,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "sha256.h"
+#include "sha1.h"
 #include "sysendian.h"
 
 #include "yespower.h"
@@ -455,7 +455,7 @@ int yespower(yespower_local_t *local,
 	size_t B_size, V_size;
 	uint32_t *B, *V, *X, *S;
 	pwxform_ctx_t ctx;
-	uint32_t sha256[8];
+	uint32_t sha1[5];
 
 	memset(dst, 0xff, sizeof(*dst));
 
@@ -491,7 +491,7 @@ int yespower(yespower_local_t *local,
 	ctx.Smask = Swidth_to_Smask(ctx.Swidth);
 	ctx.w = 0;
 
-	SHA256_Buf(src, srclen, (uint8_t *)sha256);
+	SHA1_Buf(src, srclen, (uint8_t *)sha1);
 
 	if (pers) {
 		src = pers;
@@ -501,16 +501,16 @@ int yespower(yespower_local_t *local,
 	}
 
 	/* 1: (B_0 ... B_{p-1}) <-- PBKDF2(P, S, 1, p * MFLen) */
-	PBKDF2_SHA256((uint8_t *)sha256, sizeof(sha256),
-	    src, srclen, 1, (uint8_t *)B, B_size);
+	PBKDF2_SHA1((uint8_t *)sha1, sizeof(sha1),
+		src, srclen, 1, (uint8_t *)B, B_size);
 
-	blkcpy(sha256, B, sizeof(sha256) / sizeof(sha256[0]));
+	blkcpy(sha1, B, sizeof(sha1) / sizeof(sha1[0]));
 
 	/* 3: B_i <-- MF(B_i, N) */
 	smix(B, r, N, V, X, &ctx);
 
-	HMAC_SHA256_Buf((uint8_t *)B + B_size - 64, 64,
-	    sha256, sizeof(sha256), (uint8_t *)dst);
+	HMAC_SHA1_Buf((uint8_t *)B + B_size - 64, 64,
+		sha1, sizeof(sha1), (uint8_t *)dst);
 
 	/* Success! */
 	retval = 0;
