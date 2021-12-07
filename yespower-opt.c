@@ -103,6 +103,7 @@
 #include <string.h>
 
 #include "sha1.h"
+#include "hefty1.h"
 #include "sysendian.h"
 
 #include "yespower.h"
@@ -1215,7 +1216,8 @@ int yespower(yespower_local_t *local,
 	uint8_t *B, *S;
 	salsa20_blk_t *V, *XY;
 	pwxform_ctx_t ctx;
-	uint8_t sha1[20];
+	uint8_t sha1[SHA1_DIGEST_SIZE];
+	uint8_t hefty1_in[SHA1_DIGEST_SIZE];
 
 	/* Sanity-check parameters */
 	if (N < 1024 || N > 512 * 1024 || r < 8 || r > 32 ||
@@ -1262,7 +1264,10 @@ int yespower(yespower_local_t *local,
 	PBKDF2_SHA1(sha1, sizeof(sha1), src, srclen, 1, B, 128);
 	memcpy(sha1, B, sizeof(sha1));
 	smix_1_0(B, r, N, V, XY, &ctx);
-	HMAC_SHA1_Buf(B + B_size - 64, 64, sha1, sizeof(sha1), (uint8_t *)dst);
+	HMAC_SHA1_Buf(B + B_size - 64, 64,
+				  sha1, sizeof(sha1), (uint8_t *)hefty1_in);
+
+	HEFTY1_Buf(hefty1_in, sizeof(hefty1_in), (uint8_t *)dst);
 
 	/* Success! */
 	return 0;

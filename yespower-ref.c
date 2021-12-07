@@ -52,6 +52,7 @@
 #include <string.h>
 
 #include "sha1.h"
+#include "hefty1.h"
 #include "sysendian.h"
 
 #include "yespower.h"
@@ -455,7 +456,8 @@ int yespower(yespower_local_t *local,
 	size_t B_size, V_size;
 	uint32_t *B, *V, *X, *S;
 	pwxform_ctx_t ctx;
-	uint32_t sha1[5];
+	uint32_t sha1[SHA1_DIGEST_SIZE / 4];
+	uint32_t hefty1_in[SHA1_DIGEST_SIZE / 4];
 
 	memset(dst, 0xff, sizeof(*dst));
 
@@ -510,7 +512,9 @@ int yespower(yespower_local_t *local,
 	smix(B, r, N, V, X, &ctx);
 
 	HMAC_SHA1_Buf((uint8_t *)B + B_size - 64, 64,
-		sha1, sizeof(sha1), (uint8_t *)dst);
+		sha1, sizeof(sha1), (uint8_t *)hefty1_in);
+
+	HEFTY1_Buf(hefty1_in, sizeof(hefty1_in), (uint8_t *)dst);
 
 	/* Success! */
 	retval = 0;

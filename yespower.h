@@ -61,10 +61,10 @@ typedef struct {
 } yespower_params_t;
 
 /**
- * A 160-bit yespower hash.
+ * A 256-bit yespower hash.
  */
 typedef struct {
-	unsigned char uc[20];
+	unsigned char uc[32];
 } yespower_binary_t;
 
 /**

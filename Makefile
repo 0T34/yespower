@@ -32,7 +32,7 @@ LDFLAGS = -s -lrt
 
 PROJ = tests benchmark
 OBJS_CORE = yespower-opt.o
-OBJS_COMMON = sha1.o
+OBJS_COMMON = sha1.o hefty1.o
 OBJS_TESTS = $(OBJS_CORE) $(OBJS_COMMON) tests.o
 OBJS_BENCHMARK = $(OBJS_CORE) $(OBJS_COMMON) benchmark.o
 OBJS_RM = yespower-*.o

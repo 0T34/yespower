@@ -1,7 +1,7 @@
-yespower(2048, 8, NULL) = 18 a8 4b ac 41 ed 0f ca 8a 7f 26 ef 96 18 bc 2c 0b b4 b4 c2
-yespower(4096, 16, NULL) = bf 00 d8 97 5c 35 4e 4e 5b 72 06 7d b4 07 e0 3e 82 b3 49 a9
-yespower(4096, 32, NULL) = 4b d2 ca 7f fb 71 e8 a9 ac b1 9e 21 5f 17 67 33 51 bd 66 b0
-yespower(2048, 32, NULL) = aa 1a d4 e4 5c a1 59 29 4e 1f fd b0 ac c0 10 82 13 67 df 6d
-yespower(1024, 32, NULL) = a3 6f 7c 09 c0 21 04 56 79 4d 70 b5 da 39 62 c4 0d 3b b3 7d
-yespower(1024, 32, "personality test") = bf 38 a4 c4 5e 62 9b 35 e1 1d 63 3c 01 19 0b f3 61 31 0c a7
-XOR of yespower = 11 81 ea 14 8f 52 28 bb f8 33 26 50 d7 b9 25 4b 12 4e 8b 8c
+yespower(2048, 8, NULL) = b1 a6 51 a3 a8 80 29 f6 72 f6 8a 8f 8e cf 90 a0 7b 92 60 ef d1 d6 d2 68 2f 61 fd 7c 38 44 6d 98
+yespower(4096, 16, NULL) = e0 5e f9 bb 4b 92 dd d9 f4 c4 18 84 b4 94 2f 53 5e e3 3e 7d cb 4c 2a 45 64 70 c7 1f 7d 3a 1e 51
+yespower(4096, 32, NULL) = e8 5d ad 8b cf 00 39 74 a7 18 f7 df 9d 06 32 34 31 82 3a 99 9d 83 03 fc ea ba 8e c2 7c 10 4b 54
+yespower(2048, 32, NULL) = de 3f 5e 8d 84 4b 33 ab 96 2a cc 2d 8b 0a 3e 25 85 35 10 04 54 34 4d 2a aa 36 f3 20 88 28 c9 fc
+yespower(1024, 32, NULL) = d3 52 eb dd 80 f5 2f 28 36 05 ed 5c 73 85 e0 bf 3b e2 c2 16 5f c7 81 9f 1e 3d f4 66 c5 c7 9f e7
+yespower(1024, 32, "personality test") = 37 77 d9 fd fa 2f d4 79 e1 8b 0f 0e b7 2c 3f ca 25 44 16 43 b0 87 f9 6b 4e 3c 85 cf b1 64 d1 56
+XOR of yespower = 82 c2 b8 bd 30 c0 c2 ea 37 9c 84 92 b7 09 b0 38 12 58 76 16 57 6b 8b 1a 11 2a 25 79 19 79 f2 93
